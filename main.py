@@ -15,7 +15,7 @@ def main(args):
     else:
         config = load_config(args.config)
 
-    config.device = f'device:{args.gpu}'
+    config.device = f'cuda:{args.gpu}'
 
     log_file = os.path.join(args.logdir, f'{args.mode}_log.txt')
     stream_handler = logging.StreamHandler()
