@@ -11,7 +11,7 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
 from .env.hiv_dynamics import HIV
-from .model import A2C_MODEL
+from .model import A2C_CONTI_MODEL, A2C_DISCRETE_MODEL
 from .utils import load_ckpt, save_ckpt
 
 
@@ -42,7 +42,7 @@ class A2C_AGENT:
         writer = SummaryWriter(tb_dir)
 
         device = config.device
-        net = A2C_MODEL(config, state_size=6, action_size=2).to(device)
+        net = A2C_CONTI_MODEL(config, state_size=6, action_size=2).to(device)
         if config.multi_gpu:
             net = nn.DataParallel(net)
         optimizer = optim.Adam(net.parameters(), lr=config.train.lr)
@@ -72,7 +72,7 @@ class A2C_AGENT:
             ref_values = []
 
             # One trajectory
-            for _ in range(config.env.T_max):
+            for t in range(config.env.T_max):
                 state = torch.from_numpy(env.state).type(torch.float32).to(device)
                 states.append(state)
                 mu, var, _ = info['net'](state)
@@ -81,6 +81,7 @@ class A2C_AGENT:
                 actions.append(torch.from_numpy(action))
 
                 next_state, reward, done = env.step(action)
+                print(t, torch.cat([mu, var], dim=1)[0].data, int(next_state[0, -1]))
                 next_state = torch.from_numpy(next_state).type(torch.float32).to(device)
                 reward = torch.from_numpy(reward).type(torch.float32).to(device)
                 if not done:
@@ -127,7 +128,7 @@ class A2C_AGENT:
 
             # Evaluate
             if info['episode'] % config.train.eval_freq == 0:
-                self.eval(config, logdir)
+                self.eval(config, logdir, None, writer)
 
             # Archive checkpoint (save as ckpt_123.pt)
             if info['episode'] % config.train.archive_freq == 0 or info['episode'] == config.train.max_episode:
@@ -135,9 +136,9 @@ class A2C_AGENT:
 
             info['episode'] = episode + 1
 
-    def eval(self, config, logdir, ckpt_num=None):
+    def eval(self, config, logdir, ckpt_num=None, writer=None):
         device = config.device
-        net = A2C_MODEL(config, state_size=6, action_size=2).to(device)
+        net = A2C_CONTI_MODEL(config, state_size=6, action_size=2).to(device)
         if config.multi_gpu:
             net = nn.DataParallel(net)
         env = HIV(config)
@@ -159,7 +160,7 @@ class A2C_AGENT:
                 state = torch.from_numpy(env.state).type(torch.float32).to(device)
                 states.append(state)
                 mu, var, _ = info['net'](state)
-                action = self.choose_action(mu, var)
+                action = self.choose_action(mu, var, stochastic=False)
                 action = env.trim_action(action)
                 actions.append(torch.from_numpy(action))
                 _, reward, _ = env.step(action)
@@ -168,10 +169,11 @@ class A2C_AGENT:
         states = torch.cat(states, dim=0).cpu().numpy()
         actions = torch.cat(actions, dim=0).cpu().numpy()
         rewards = torch.cat(rewards, dim=0).cpu().numpy()
-        cum_rewards = rewards.sum()
+        cum_reward = rewards.sum() * env.scaler
+        writer.add_scalar('cum_reward', cum_reward, info['episode'])
 
         fig = plt.figure(figsize=(16, 10))
-        plt.title(f'Episode {info["episode"]} | Cumulative reward {cum_rewards * env.scaler:.5e}')
+        plt.title(f'Episode {info["episode"]} | Cumulative reward {cum_reward:.5e}')
         plt.axis('off')
         axis_t = np.arange(0, config.env.T_max)
         legends = ['T1', 'T2', 'T1I', 'T2I', 'V', 'E', 'a1', 'a2', 'reward']
