@@ -1,0 +1,27 @@
+multi_gpu: False
+
+env:
+    init_state: [1.0e+6, 3198, 1.0e-4, 1.0e-4, 1, 10]
+    batch_size: 100 
+    T_max: 600 # (days)
+    method: 'RK45'
+
+model:
+    n_layers: 6
+    nf: 512
+    normalization: 'layernorm'
+    activation: 'silu'
+
+train:
+    max_episode: 10000
+    entropy_beta: 1.0e-4
+    grad_clip: 10 # critical
+    discount: 1
+    lr: 1.0e-4
+    log_freq: 1
+    eval_freq: 5
+    save_freq: 5
+    archive_freq: 100
+
+eval:
+    ckpt_num: 5
