@@ -30,12 +30,8 @@ class A2C_CONTI_MODEL(nn.Module):
         super().__init__()
         nf = config.model.nf
         n_layers = config.model.n_layers
-        self.max_action = torch.Tensor([0.7, 0.3]).reshape(1, -1)
-        self.max_action.requires_grad_(False)
-        self.input_normalizer = torch.Tensor(
-            [1e+6, 3000, 400000, 2000, 1e+6, 10000]
-        ).reshape(1, -1)
-        self.input_normalizer.requires_grad_(False)
+        self.avg_action = torch.Tensor([0.35, 0.15]).reshape(1, -1)
+        self.avg_action.requires_grad_(False)
         
         self.main = nn.ModuleList([])
 
@@ -61,20 +57,13 @@ class A2C_CONTI_MODEL(nn.Module):
             if isinstance(m, nn.Linear):
                 nn.init.xavier_uniform_(m.weight)
                 nn.init.zeros_(m.bias)
-
-    def normalize(self, x: torch.Tensor):
-        '''Not used now'''
-        out = x / self.input_normalizer.to(x)
-        return out
         
     def forward(self, x: torch.Tensor):
         out = self.main[0](torch.log(x + 1e-10), is_residual=False)
-        # x = self.normalize(x)
-        # out = self.main[0](x, is_residual=False)
         for i in range(1, len(self.main)):
             out = self.main[i](out, is_residual=True)
-        max_action = self.max_action.repeat(x.shape[0], 1).to(x)
-        return self.mu(out) * max_action, self.var(out), self.value(out)
+        avg_action = self.avg_action.repeat(x.shape[0], 1).to(x)
+        return self.mu(out) + avg_action, self.var(out), self.value(out)
 
 
 class A2C_DISCRETE_MODEL(nn.Module):
@@ -82,8 +71,6 @@ class A2C_DISCRETE_MODEL(nn.Module):
         super().__init__()
         nf = config.model.nf
         n_layers = config.model.n_layers
-        self.max_action = torch.Tensor([0.7, 0.3]).reshape(1, -1)
-        self.max_action.requires_grad_(False)
         self.input_normalizer = torch.Tensor(
             [1e+6, 3000, 400000, 2000, 1e+6, 10000]
         ).reshape(1, -1)

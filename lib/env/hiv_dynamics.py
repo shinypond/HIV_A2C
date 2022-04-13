@@ -35,7 +35,7 @@ class HIV(BaseEnv):
     max_a2 = 0.3
 
     # Reward hyperparameters
-    scaler = 1.0e+6
+    scaler = 1.0
     Q = 0.1
     R1 = 20000
     R2 = 20000
@@ -56,9 +56,16 @@ class HIV(BaseEnv):
         self.state = np.repeat(self.state, self.batch_size, axis=0) 
         self.t_now = 0
 
-    def step(self, action: np.ndarray):
+        # If discrete
+        self.discrete_actions = np.array([
+            [0.0, 0.0], [0.0, 0.3], [0.7, 0.0], [0.7, 0.3],
+        ])
+
+    def step(self, action: np.ndarray, discrete: bool = False):
         B = self.batch_size
         reward = np.zeros((B, 1))
+        if discrete:
+            action = self.discrete_actions[list(action), :]
         assert action.shape == (B, 2)
         x = np.concatenate([self.state, action, reward], axis=-1)
         x = x.reshape(-1)
@@ -84,7 +91,8 @@ class HIV(BaseEnv):
 
         y = sol.y[:, -1].reshape(B, -1)
         self.state = y[:, :6] # Next state (observation)
-        reward = y[:, -1] / self.scaler
+        # reward = y[:, -1] / self.scaler
+        reward = np.log10(np.where(y[:, -1] > 1e-10, y[:, -1], 1e-10)) / self.scaler
 
         self.t_now += 1
         done = 0 if self.t_now < self.T_max else 1

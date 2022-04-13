@@ -2,7 +2,7 @@ import os
 import argparse
 import logging
 
-from lib.agent import A2C_AGENT
+from lib.agent import A2C_CONTI_AGENT, A2C_DISCRETE_AGENT
 from lib.utils import dict2namespace, load_config, load_and_copy_config, str2bool
 
 
@@ -28,7 +28,11 @@ def main(args):
     logger.addHandler(file_handler)
     logger.setLevel('INFO')
 
-    agent = A2C_AGENT()
+    if args.conti:
+        agent = A2C_CONTI_AGENT()
+    else:
+        agent = A2C_DISCRETE_AGENT()
+
     if args.mode == 'train':
         agent.train(config, args.logdir, args.resume)
     elif args.mode == 'eval':
@@ -44,5 +48,6 @@ if __name__ == '__main__':
     parser.add_argument('--logdir', type=str, required=True)
     parser.add_argument('--resume', type=str2bool, default=False)
     parser.add_argument('--gpu', type=int, default=0)
+    parser.add_argument('--conti', type=str2bool, default=True)
     args = parser.parse_args()
     main(args)
